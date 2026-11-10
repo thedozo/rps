@@ -1,258 +1,592 @@
-html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rock Paper Scissors - Chaos Simulation</title>
+    <title>Ultimate Chaos RPSLS Simulator</title>
     <style>
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            user-select: none;
         }
         body {
-            background-color: #111;
+            background-color: #0b0c10;
             color: #fff;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             overflow: hidden;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             height: 100vh;
             width: 100vw;
         }
-        #controls {
-            position: absolute;
-            top: 15px;
-            z-index: 10;
-            background: rgba(20, 20, 20, 0.85);
-            padding: 12px 24px;
-            border-radius: 30px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            backdrop-filter: blur(10px);
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            border: 1px solid #333;
-        }
-        button {
-            background: #e63946;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.1s, background 0.2s;
-        }
-        button:hover {
-            background: #ff4d5a;
-            transform: scale(1.05);
-        }
-        #scoreboard {
-            display: flex;
-            gap: 20px;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        .score-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        #simulation-container {
+            position: relative;
+            flex-grow: 1;
+            height: 100%;
         }
         canvas {
             display: block;
             width: 100%;
             height: 100%;
+            cursor: crosshair;
+        }
+        
+        /* UI Control Bar Overlay */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(31, 40, 51, 0.85);
+            padding: 12px 24px;
+            border-radius: 40px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            border: 1px solid #45f3ff;
+        }
+        button {
+            background: #45f3ff;
+            color: #0b0c10;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background: #fff;
+            box-shadow: 0 0 15px #45f3ff;
+            transform: scale(1.03);
+        }
+        button.paused {
+            background: #ff4d5a;
+            color: white;
+        }
+
+        /* Sidebar Stats Panel */
+        #sidebar {
+            width: 280px;
+            background: rgba(22, 26, 35, 0.95);
+            border-left: 2px solid #1f2833;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            justify-content: space-between;
+            z-index: 5;
+        }
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #45f3ff;
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #1f2833;
+            padding-bottom: 10px;
+        }
+        .stats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-grow: 1;
+        }
+        .stat-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 1rem;
+            background: #1f2833;
+            padding: 10px 14px;
+            border-radius: 10px;
+        }
+        
+        /* Live Chart Bars */
+        .chart-container {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #11141a;
+            padding: 15px;
+            border-radius: 12px;
+        }
+        .bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .bar-label {
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .bar-track {
+            width: 100%;
+            height: 12px;
+            background: #1f2833;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        /* Screen States Overlay */
+        #menu-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 12, 16, 0.85);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            transition: opacity 0.3s ease;
+        }
+        #menu-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #menu-overlay h1 {
+            font-size: 2.5rem;
+            color: #45f3ff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(69,243,255,0.4);
+            text-align: center;
+        }
+        #menu-overlay p {
+            color: #c5a880;
+            margin-bottom: 25px;
+            font-size: 1rem;
+            text-align: center;
+        }
+        
+        /* Particle Selector Layout */
+        .selector-box {
+            background: rgba(31, 40, 51, 0.6);
+            border: 1px solid #1f2833;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .selector-box label {
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+            color: #85929E;
+            text-transform: uppercase;
+        }
+        .radio-group {
+            display: flex;
+            gap: 15px;
+        }
+        .radio-group label {
+            background: #1f2833;
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .radio-group input {
+            display: none;
+        }
+        .radio-group input:checked + label {
+            border-color: #45f3ff;
+            background: rgba(69, 243, 255, 0.15);
+            color: #45f3ff;
+            box-shadow: 0 0 10px rgba(69, 243, 255, 0.2);
+        }
+
+        .big-start-btn {
+            padding: 15px 40px;
+            font-size: 1.3rem;
+            border-radius: 30px;
         }
     </style>
 </head>
 <body>
 
-    <div id="controls">
-        <button id="resetBtn">Reset Chaos</button>
-        <div id="scoreboard">
-            <div class="score-item">🪨 <span id="rockCount">0</span></div>
-            <div class="score-item">📄 <span id="paperCount">0</span></div>
-            <div class="score-item">✂️ <span id="scissorsCount">0</span></div>
+    <div id="simulation-container">
+        <!-- Main Controls Over Canvas -->
+        <div id="hud">
+            <button id="playPauseBtn">Pause</button>
+            <button id="resetBtn">Reset</button>
+            <span style="font-size:0.85rem; color:#85929E;">💡 Click screen to inject raw elements</span>
         </div>
+
+        <!-- Initial Start, Pause, & Win Screen Overlay -->
+        <div id="menu-overlay">
+            <h1 id="overlayTitle">RPSLS CHAOS</h1>
+            <p id="overlaySub">Rock • Paper • Scissors • Lizard • Spock</p>
+            
+            <!-- Particle Count Selection Module -->
+            <div class="selector-box" id="selectorContainer">
+                <label>Items per species</label>
+                <div class="radio-group">
+                    <input type="radio" id="count20" name="spawnCount" value="20">
+                    <label for="count20">20</label>
+                    
+                    <input type="radio" id="count50" name="spawnCount" value="50" checked>
+                    <label for="count50">50</label>
+                    
+                    <input type="radio" id="count100" name="spawnCount" value="100">
+                    <label for="count100">100</label>
+                </div>
+            </div>
+
+            <button id="bigActionBtn" class="big-start-btn">Start Simulation</button>
+        </div>
+
+        <canvas id="simCanvas"></canvas>
     </div>
 
-    <canvas id="simCanvas"></canvas>
+    <!-- Data Panel Sidebar -->
+    <div id="sidebar">
+        <div>
+            <div class="panel-title">LIVE RADAR COUNTS</div>
+            <div class="stats-list">
+                <div class="stat-row"><span>🪨 Rock</span><span id="lblROCK">0</span></div>
+                <div class="stat-row"><span>📄 Paper</span><span id="lblPAPER">0</span></div>
+                <div class="stat-row"><span>✂️ Scissors</span><span id="lblSCISSORS">0</span></div>
+                <div class="stat-row"><span>🦎 Lizard</span><span id="lblLIZARD">0</span></div>
+                <div class="stat-row"><span>🖖 Spock</span><span id="lblSPOCK">0</span></div>
+            </div>
+        </div>
+
+        <!-- Live Dynamic Bar Chart -->
+        <div class="chart-container">
+            <div class="panel-title" style="margin-bottom:10px; font-size:0.9rem;">POPULATION SHARE</div>
+            <div id="chartBars"></div>
+        </div>
+    </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Target settings
-        const PARTICLE_COUNT = 300;
-        const PARTICLE_SIZE = 14; 
-        const MAX_SPEED = 4;
-        const CHAOS_FACTOR = 0.3; // Sudden random steering forces
-        const ATTRACTION_FORCE = 0.05; // Soft gravity toward opposing species
-
+        // Extended Rock-Paper-Scissors-Lizard-Spock Matrix rules
         const TYPES = {
-            ROCK: { emoji: '🪨', color: '#ffb703' },
-            PAPER: { emoji: '📄', color: '#219ebc' },
-            SCISSORS: { emoji: '✂️', color: '#fb8500' }
+            ROCK: { emoji: '🪨', color: '#ffb703', beats: ['SCISSORS', 'LIZARD'] },
+            PAPER: { emoji: '📄', color: '#219ebc', beats: ['ROCK', 'SPOCK'] },
+            SCISSORS: { emoji: '✂️', color: '#fb8500', beats: ['PAPER', 'LIZARD'] },
+            LIZARD: { emoji: '🦎', color: '#4ade80', beats: ['SPOCK', 'PAPER'] },
+            SPOCK: { emoji: '🖖', color: '#a855f7', beats: ['ROCK', 'SCISSORS'] }
         };
-
         const TYPE_KEYS = Object.keys(TYPES);
+
+        // Simulation parameters
+        const PARTICLE_SIZE = 14; 
+        const MAX_SPEED = 3.5;
+        const CHAOS_FACTOR = 0.35;
+        const ATTRACTION_FORCE = 0.06;
+
         let particles = [];
+        let visualEffects = [];
+        let isRunning = false;
+        let isGameOver = false;
+        let isFirstStart = true;
 
-        // Adjust Canvas to match viewport size
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        class Particle {
-            constructor(x, y, type) {
-                this.x = x;
-                this.y = y;
-                this.type = type;
-                this.radius = PARTICLE_SIZE;
-                
-                // Random starting velocity vectors
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 1 + Math.random() * 2;
-                this.vx = Math.cos(angle) * speed;
-                this.vy = Math.sin(angle) * speed;
-            }
-
-            update() {
-                // Apply chaotic jitter (Brownian-like perturbation)
-                this.vx += (Math.random() - 0.5) * CHAOS_FACTOR;
-                this.vy += (Math.random() - 0.5) * CHAOS_FACTOR;
-
-                // Move particle
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Speed limit constraints
-                const speed = Math.hypot(this.vx, this.vy);
-                if (speed > MAX_SPEED) {
-                    this.vx = (this.vx / speed) * MAX_SPEED;
-                    this.vy = (this.vy / speed) * MAX_SPEED;
-                }
-
-                // Bounce off screen boundaries
-                if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
-                if (this.x + this.radius > canvas.width) { this.x = canvas.width - this.radius; this.vx *= -1; }
-                if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -1; }
-                if (this.y + this.radius > canvas.height) { this.y = canvas.height - this.radius; this.vy *= -1; }
-            }
-
-            draw() {
-                ctx.save();
-                ctx.font = `${this.radius * 2}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(TYPES[this.type].emoji, this.x, this.y);
-                ctx.restore();
-            }
-
-            // Determines what this particle wants to hunt down
-            getPrey() {
-                if (this.type === 'ROCK') return 'SCISSORS';
-                if (this.type === 'PAPER') return 'ROCK';
-                if (this.type === 'SCISSORS') return 'PAPER';
-            }
-        }
-
-        function initSimulation() {
-            particles = [];
-            for (let i = 0; i < PARTICLE_COUNT; i++) {
-                const x = Math.random() * (canvas.width - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
-                const y = Math.random() * (canvas.height - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
-                const type = TYPE_KEYS[i % 3];
-                particles.push(new Particle(x, y, type));
-            }
-        }
-
-        function resolveInteractions() {
-            let counts = { ROCK: 0, PAPER: 0, SCISSORS: 0 };
-
-            for (let i = 0; i < particles.length; i++) {
-                const p1 = particles[i];
-                counts[p1.type]++;
-
-                // Find closest prey to gravitate towards (adding structure to chaos)
-                let closestPrey = null;
-                let minDist = Infinity;
-                const targetPreyType = p1.getPrey();
-
-                for (let j = 0; j < particles.length; j++) {
-                    if (i === j) continue;
-                    const p2 = particles[j];
-                    const dx = p2.x - p1.x;
-                    const dy = p2.y - p1.y;
-                    const dist = Math.hypot(dx, dy);
-
-                    // Check for overlap/collision
-                    if (dist < p1.radius + p2.radius) {
-                        handleCollision(p1, p2);
-                    }
-
-                    // Keep track of nearest target
-                    if (p2.type === targetPreyType && dist < minDist) {
-                        minDist = dist;
-                        closestPrey = p2;
-                    }
-                }
-
-                // Smooth attraction movement toward target prey
-                if (closestPrey && minDist < 250) {
-                    p1.vx += ((closestPrey.x - p1.x) / minDist) * ATTRACTION_FORCE;
-                    p1.vy += ((closestPrey.y - p1.y) / minDist) * ATTRACTION_FORCE;
-                }
-            }
-
-            // Update UI Scoreboard
-            document.getElementById('rockCount').innerText = counts.ROCK;
-            document.getElementById('paperCount').innerText = counts.PAPER;
-            document.getElementById('scissorsCount').innerText = counts.SCISSORS;
-        }
-
-        function handleCollision(p1, p2) {
-            if (p1.type === p2.type) return;
-
-            // Classic rules logic
-            if (
-                (p1.type === 'ROCK' && p2.type === 'SCISSORS') ||
-                (p1.type === 'PAPER' && p2.type === 'ROCK') ||
-                (p1.type === 'SCISSORS' && p2.type === 'PAPER')
-            ) {
-                p2.type = p1.type; // p1 wins, converts p2
-            } else {
-                p1.type = p2.type; // p2 wins, converts p1
-            }
-        }
-
-        function animate() {
-            // Semi-transparent background refresh creates a faint motion blur trail
-            ctx.fillStyle = 'rgba(17, 17, 17, 0.3)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            resolveInteractions();
-
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
-
-            requestAnimationFrame(animate);
-        }
-
-        // Hook up Control actions
-        document.getElementById('resetBtn').addEventListener('click', initSimulation);
-
-        // Run
-        initSimulation();
-        animate();
-    </script>
-</body>
-</html>
+        // UI Element References
+        const menuOverlay = document.getElementById('menu-overlay');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const overlaySub = document.getElementById('overlaySub');
+        const selectorContainer = document.getElementById('selectorContainer');
+        const bigActionBtn = document.getElementById('bigActionBtn');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+function resize() {
+canvas.width = canvas.parentElement.clientWidth;
+canvas.height = canvas.parentElement.clientHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+class Particle {
+constructor(x, y, type) {
+this.x = x;
+this.y = y;
+this.type = type;
+this.radius = PARTICLE_SIZE;
+const angle = Math.random() * Math.PI * 2;
+const speed = 1 + Math.random() * 2;
+this.vx = Math.cos(angle) * speed;
+this.vy = Math.sin(angle) * speed;
+}
+update() {
+this.vx += (Math.random() - 0.5) * CHAOS_FACTOR;
+this.vy += (Math.random() - 0.5) * CHAOS_FACTOR;
+this.x += this.vx;
+this.y += this.vy;
+const speed = Math.hypot(this.vx, this.vy);
+if (speed > MAX_SPEED) {
+this.vx = (this.vx / speed) * MAX_SPEED;
+this.vy = (this.vy / speed) * MAX_SPEED;
+}
+if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
+if (this.x + this.radius > canvas.width) { this.x = canvas.width - this.radius; this.vx *= -1; }
+if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -1; }
+if (this.y + this.radius > canvas.height) { this.y = canvas.height - this.radius; this.vy *= -1; }
+}
+draw() {
+ctx.save();
+ctx.font = ${this.radius * 2}px Arial;
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText(TYPES[this.type].emoji, this.x, this.y);
+ctx.restore();
+}
+}
+// Particle Impact / Explosion Particle Class
+class CollisionEffect {
+constructor(x, y, color, type = 'ring') {
+this.x = x;
+this.y = y;
+this.color = color;
+this.type = type;
+this.radius = PARTICLE_SIZE;
+this.alpha = 1;
+// For explosion particles
+if (type === 'spark') {
+const angle = Math.random() * Math.PI * 2;
+const speed = 2 + Math.random() * 6;
+this.vx = Math.cos(angle) * speed;
+this.vy = Math.sin(angle) * speed;
+this.decay = 0.015 + Math.random() * 0.02;
+this.radius = 2 + Math.random() * 4;
+} else {
+this.decay = 0.04;
+}
+}
+update() {
+if (this.type === 'spark') {
+this.x += this.vx;
+this.y += this.vy;
+} else {
+this.radius += 1.5;
+}
+this.alpha -= this.decay;
+}
+draw() {
+ctx.save();
+ctx.globalAlpha = Math.max(0, this.alpha);
+ctx.beginPath();
+if (this.type === 'spark') {
+ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+ctx.fillStyle = this.color;
+ctx.fill();
+} else {
+ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+ctx.strokeStyle = this.color;
+ctx.lineWidth = 3;
+ctx.stroke();
+}
+ctx.restore();
+}
+}
+function getSelectedSpawnCount() {
+const checkedRadio = document.querySelector('input[name="spawnCount"]:checked');
+return checkedRadio ? parseInt(checkedRadio.value, 10) : 50;
+}
+function initSimulation() {
+particles = [];
+visualEffects = [];
+isGameOver = false;
+const itemsPerSpecies = getSelectedSpawnCount();
+// Generate exact chosen numbers balanced perfectly across all species
+TYPE_KEYS.forEach(typeKey => {
+for (let i = 0; i < itemsPerSpecies; i++) {
+const x = Math.random() * (canvas.width - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
+const y = Math.random() * (canvas.height - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
+particles.push(new Particle(x, y, typeKey));
+}
+});
+buildChartDOM();
+updateScoresAndCharts();
+}
+function buildChartDOM() {
+const container = document.getElementById('chartBars');
+container.innerHTML = '';
+TYPE_KEYS.forEach(k => {
+container.innerHTML += <div class="bar-wrapper"> <div class="bar-label"><span>${TYPES[k].emoji}</span><span id="pct${k}">0%</span></div> <div class="bar-track"><div id="bar${k}" class="bar-fill" style="background:${TYPES[k].color}"></div></div> </div>;
+});
+}
+function processInteractions() {
+for (let i = 0; i < particles.length; i++) {
+const p1 = particles[i];
+let closestPrey = null;
+let minDist = Infinity;
+for (let j = 0; j < particles.length; j++) {
+if (i === j) continue;
+const p2 = particles[j];
+const dx = p2.x - p1.x;
+const dy = p2.y - p1.y;
+const dist = Math.hypot(dx, dy);
+if (dist < p1.radius + p2.radius) {
+handleCombat(p1, p2);
+}
+if (TYPES[p1.type].beats.includes(p2.type) && dist < minDist) {
+minDist = dist;
+closestPrey = p2;
+}
+}
+if (closestPrey && minDist < 300) {
+p1.vx += ((closestPrey.x - p1.x) / minDist) * ATTRACTION_FORCE;
+p1.vy += ((closestPrey.y - p1.y) / minDist) * ATTRACTION_FORCE;
+}
+}
+}
+function handleCombat(p1, p2) {
+if (p1.type === p2.type) return;
+if (TYPES[p1.type].beats.includes(p2.type)) {
+spawnEffect(p2.x, p2.y, TYPES[p1.type].color);
+p2.type = p1.type;
+} else if (TYPES[p2.type].beats.includes(p1.type)) {
+spawnEffect(p1.x, p1.y, TYPES[p2.type].color);
+p1.type = p2.type;
+}
+}
+function spawnEffect(x, y, color, type = 'ring') {
+visualEffects.push(new CollisionEffect(x, y, color, type));
+}
+// Creates a firework/shrapnel explosion at canvas center
+function spawnVictoryExplosion(color) {
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+for (let i = 0; i < 150; i++) {
+spawnEffect(centerX, centerY, color, 'spark');
+}
+}
+function updateScoresAndCharts() {
+let counts = { ROCK: 0, PAPER: 0, SCISSORS: 0, LIZARD: 0, SPOCK: 0 };
+particles.forEach(p => counts[p.type]++);
+let total = particles.length || 1;
+let activeSpecies = [];
+TYPE_KEYS.forEach(k => {
+document.getElementById(lbl${k}).innerText = counts[k];
+let percent = Math.round((counts[k] / total) * 100);
+document.getElementById(pct${k}).innerText = ${percent}%;
+document.getElementById(bar${k}).style.width = ${percent}%;
+if (counts[k] > 0) {
+activeSpecies.push(k);
+}
+});
+// Trigger Win Splash Screen condition check
+if (activeSpecies.length === 1 && !isGameOver && !isFirstStart) {
+triggerWinScreen(activeSpecies[0]);
+}
+}
+function triggerWinScreen(winnerKey) {
+isGameOver = true;
+isRunning = false;
+const winner = TYPES[winnerKey];
+// Pop the dynamic victory screen elements
+overlayTitle.innerHTML = ${winner.emoji} VICTORY ${winner.emoji};
+overlaySub.innerText = ${winnerKey} has conquered the entire chaotic cosmos!;
+bigActionBtn.innerText = "Run Another Simulation";
+// Bring back the particle counting selector options for the next match
+selectorContainer.style.display = "flex";
+menuOverlay.classList.remove('hidden');
+// Shoot a gigantic center explosion
+spawnVictoryExplosion(winner.color);
+}
+canvas.addEventListener('click', (e) => {
+if (isGameOver) return;
+const rect = canvas.getBoundingClientRect();
+const mouseX = e.clientX - rect.left;
+const mouseY = e.clientY - rect.top;
+for(let i=0; i<5; i++) {
+const offsetAngle = Math.random() * Math.PI * 2;
+const offsetDist = Math.random() * 15;
+const finalX = mouseX + Math.cos(offsetAngle) * offsetDist;
+const finalY = mouseY + Math.sin(offsetAngle) * offsetDist;
+const randomType = TYPE_KEYS[Math.floor(Math.random() * TYPE_KEYS.length)];
+particles.push(new Particle(finalX, finalY, randomType));
+}
+spawnEffect(mouseX, mouseY, '#45f3ff');
+updateScoresAndCharts();
+});
+function animate() {
+// Lowered blur trail opacity refresh: changed from 0.25 to 0.8 to drastically reduce blurring/ghosting
+ctx.fillStyle = 'rgba(11, 12, 16, 0.8)';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+if (isRunning) {
+processInteractions();
+particles.forEach(p => p.update());
+}
+particles.forEach(p => p.draw());
+// Handle active spark and wave entities
+for (let i = visualEffects.length - 1; i >= 0; i--) {
+visualEffects[i].update();
+visualEffects[i].draw();
+if (visualEffects[i].alpha <= 0) visualEffects.splice(i, 1);
+}
+if (isRunning) {
+updateScoresAndCharts();
+}
+requestAnimationFrame(animate);
+}
+function togglePausePlay() {
+if (isGameOver) {
+// If the game ended, the big button now resets and restarts clean
+initSimulation();
+isGameOver = false;
+isRunning = true;
+playPauseBtn.innerText = "Pause";
+playPauseBtn.classList.remove('paused');
+menuOverlay.classList.add('hidden');
+return;
+}
+if (isRunning) {
+isRunning = false;
+playPauseBtn.innerText = "Resume";
+playPauseBtn.classList.add('paused');
+overlayTitle.innerText = "Simulation Paused";
+overlaySub.innerText = "Take a breather — the micro-cosmos is on standby";
+bigActionBtn.innerText = "Resume Simulation";
+selectorContainer.style.display = "none"; // Hide size choices while simply paused
+menuOverlay.classList.remove('hidden');
+} else {
+isRunning = true;
+playPauseBtn.innerText = "Pause";
+playPauseBtn.classList.remove('paused');
+menuOverlay.classList.add('hidden');
+if (isFirstStart) {
+initSimulation();
+isFirstStart = false;
+}
+}
+}
+bigActionBtn.addEventListener('click', togglePausePlay);
+playPauseBtn.addEventListener('click', togglePausePlay);
+resetBtn.addEventListener('click', () => {
+initSimulation();
+ctx.fillStyle = '#0b0c10';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+if (isGameOver) {
+isGameOver = false;
+overlayTitle.innerText = "RPSLS CHAOS";
+overlaySub.innerText = "Rock • Paper • Scissors • Lizard • Spock";
+bigActionBtn.innerText = "Start Simulation";
+selectorContainer.style.display = "flex";
+}
+});
+// Initialize App Configuration viewports
+buildChartDOM();
+animate();
