@@ -311,282 +311,338 @@
         const selectorContainer = document.getElementById('selectorContainer');
         const bigActionBtn = document.getElementById('bigActionBtn');
         const playPauseBtn = document.getElementById('playPauseBtn');
-const resetBtn = document.getElementById('resetBtn');
-function resize() {
-canvas.width = canvas.parentElement.clientWidth;
-canvas.height = canvas.parentElement.clientHeight;
-}
-window.addEventListener('resize', resize);
-resize();
-class Particle {
-constructor(x, y, type) {
-this.x = x;
-this.y = y;
-this.type = type;
-this.radius = PARTICLE_SIZE;
-const angle = Math.random() * Math.PI * 2;
-const speed = 1 + Math.random() * 2;
-this.vx = Math.cos(angle) * speed;
-this.vy = Math.sin(angle) * speed;
-}
-update() {
-this.vx += (Math.random() - 0.5) * CHAOS_FACTOR;
-this.vy += (Math.random() - 0.5) * CHAOS_FACTOR;
-this.x += this.vx;
-this.y += this.vy;
-const speed = Math.hypot(this.vx, this.vy);
-if (speed > MAX_SPEED) {
-this.vx = (this.vx / speed) * MAX_SPEED;
-this.vy = (this.vy / speed) * MAX_SPEED;
-}
-if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
-if (this.x + this.radius > canvas.width) { this.x = canvas.width - this.radius; this.vx *= -1; }
-if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -1; }
-if (this.y + this.radius > canvas.height) { this.y = canvas.height - this.radius; this.vy *= -1; }
-}
-draw() {
-ctx.save();
-ctx.font = ${this.radius * 2}px Arial;
-ctx.textAlign = 'center';
-ctx.textBaseline = 'middle';
-ctx.fillText(TYPES[this.type].emoji, this.x, this.y);
-ctx.restore();
-}
-}
-// Particle Impact / Explosion Particle Class
-class CollisionEffect {
-constructor(x, y, color, type = 'ring') {
-this.x = x;
-this.y = y;
-this.color = color;
-this.type = type;
-this.radius = PARTICLE_SIZE;
-this.alpha = 1;
-// For explosion particles
-if (type === 'spark') {
-const angle = Math.random() * Math.PI * 2;
-const speed = 2 + Math.random() * 6;
-this.vx = Math.cos(angle) * speed;
-this.vy = Math.sin(angle) * speed;
-this.decay = 0.015 + Math.random() * 0.02;
-this.radius = 2 + Math.random() * 4;
-} else {
-this.decay = 0.04;
-}
-}
-update() {
-if (this.type === 'spark') {
-this.x += this.vx;
-this.y += this.vy;
-} else {
-this.radius += 1.5;
-}
-this.alpha -= this.decay;
-}
-draw() {
-ctx.save();
-ctx.globalAlpha = Math.max(0, this.alpha);
-ctx.beginPath();
-if (this.type === 'spark') {
-ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-ctx.fillStyle = this.color;
-ctx.fill();
-} else {
-ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-ctx.strokeStyle = this.color;
-ctx.lineWidth = 3;
-ctx.stroke();
-}
-ctx.restore();
-}
-}
-function getSelectedSpawnCount() {
-const checkedRadio = document.querySelector('input[name="spawnCount"]:checked');
-return checkedRadio ? parseInt(checkedRadio.value, 10) : 50;
-}
-function initSimulation() {
-particles = [];
-visualEffects = [];
-isGameOver = false;
-const itemsPerSpecies = getSelectedSpawnCount();
-// Generate exact chosen numbers balanced perfectly across all species
-TYPE_KEYS.forEach(typeKey => {
-for (let i = 0; i < itemsPerSpecies; i++) {
-const x = Math.random() * (canvas.width - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
-const y = Math.random() * (canvas.height - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
-particles.push(new Particle(x, y, typeKey));
-}
-});
-buildChartDOM();
-updateScoresAndCharts();
-}
-function buildChartDOM() {
-const container = document.getElementById('chartBars');
-container.innerHTML = '';
-TYPE_KEYS.forEach(k => {
-container.innerHTML += <div class="bar-wrapper"> <div class="bar-label"><span>${TYPES[k].emoji}</span><span id="pct${k}">0%</span></div> <div class="bar-track"><div id="bar${k}" class="bar-fill" style="background:${TYPES[k].color}"></div></div> </div>;
-});
-}
-function processInteractions() {
-for (let i = 0; i < particles.length; i++) {
-const p1 = particles[i];
-let closestPrey = null;
-let minDist = Infinity;
-for (let j = 0; j < particles.length; j++) {
-if (i === j) continue;
-const p2 = particles[j];
-const dx = p2.x - p1.x;
-const dy = p2.y - p1.y;
-const dist = Math.hypot(dx, dy);
-if (dist < p1.radius + p2.radius) {
-handleCombat(p1, p2);
-}
-if (TYPES[p1.type].beats.includes(p2.type) && dist < minDist) {
-minDist = dist;
-closestPrey = p2;
-}
-}
-if (closestPrey && minDist < 300) {
-p1.vx += ((closestPrey.x - p1.x) / minDist) * ATTRACTION_FORCE;
-p1.vy += ((closestPrey.y - p1.y) / minDist) * ATTRACTION_FORCE;
-}
-}
-}
-function handleCombat(p1, p2) {
-if (p1.type === p2.type) return;
-if (TYPES[p1.type].beats.includes(p2.type)) {
-spawnEffect(p2.x, p2.y, TYPES[p1.type].color);
-p2.type = p1.type;
-} else if (TYPES[p2.type].beats.includes(p1.type)) {
-spawnEffect(p1.x, p1.y, TYPES[p2.type].color);
-p1.type = p2.type;
-}
-}
-function spawnEffect(x, y, color, type = 'ring') {
-visualEffects.push(new CollisionEffect(x, y, color, type));
-}
-// Creates a firework/shrapnel explosion at canvas center
-function spawnVictoryExplosion(color) {
-const centerX = canvas.width / 2;
-const centerY = canvas.height / 2;
-for (let i = 0; i < 150; i++) {
-spawnEffect(centerX, centerY, color, 'spark');
-}
-}
-function updateScoresAndCharts() {
-let counts = { ROCK: 0, PAPER: 0, SCISSORS: 0, LIZARD: 0, SPOCK: 0 };
-particles.forEach(p => counts[p.type]++);
-let total = particles.length || 1;
-let activeSpecies = [];
-TYPE_KEYS.forEach(k => {
-document.getElementById(lbl${k}).innerText = counts[k];
-let percent = Math.round((counts[k] / total) * 100);
-document.getElementById(pct${k}).innerText = ${percent}%;
-document.getElementById(bar${k}).style.width = ${percent}%;
-if (counts[k] > 0) {
-activeSpecies.push(k);
-}
-});
-// Trigger Win Splash Screen condition check
-if (activeSpecies.length === 1 && !isGameOver && !isFirstStart) {
-triggerWinScreen(activeSpecies[0]);
-}
-}
-function triggerWinScreen(winnerKey) {
-isGameOver = true;
-isRunning = false;
-const winner = TYPES[winnerKey];
-// Pop the dynamic victory screen elements
-overlayTitle.innerHTML = ${winner.emoji} VICTORY ${winner.emoji};
-overlaySub.innerText = ${winnerKey} has conquered the entire chaotic cosmos!;
-bigActionBtn.innerText = "Run Another Simulation";
-// Bring back the particle counting selector options for the next match
-selectorContainer.style.display = "flex";
-menuOverlay.classList.remove('hidden');
-// Shoot a gigantic center explosion
-spawnVictoryExplosion(winner.color);
-}
-canvas.addEventListener('click', (e) => {
-if (isGameOver) return;
-const rect = canvas.getBoundingClientRect();
-const mouseX = e.clientX - rect.left;
-const mouseY = e.clientY - rect.top;
-for(let i=0; i<5; i++) {
-const offsetAngle = Math.random() * Math.PI * 2;
-const offsetDist = Math.random() * 15;
-const finalX = mouseX + Math.cos(offsetAngle) * offsetDist;
-const finalY = mouseY + Math.sin(offsetAngle) * offsetDist;
-const randomType = TYPE_KEYS[Math.floor(Math.random() * TYPE_KEYS.length)];
-particles.push(new Particle(finalX, finalY, randomType));
-}
-spawnEffect(mouseX, mouseY, '#45f3ff');
-updateScoresAndCharts();
-});
-function animate() {
-// Lowered blur trail opacity refresh: changed from 0.25 to 0.8 to drastically reduce blurring/ghosting
-ctx.fillStyle = 'rgba(11, 12, 16, 0.8)';
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-if (isRunning) {
-processInteractions();
-particles.forEach(p => p.update());
-}
-particles.forEach(p => p.draw());
-// Handle active spark and wave entities
-for (let i = visualEffects.length - 1; i >= 0; i--) {
-visualEffects[i].update();
-visualEffects[i].draw();
-if (visualEffects[i].alpha <= 0) visualEffects.splice(i, 1);
-}
-if (isRunning) {
-updateScoresAndCharts();
-}
-requestAnimationFrame(animate);
-}
-function togglePausePlay() {
-if (isGameOver) {
-// If the game ended, the big button now resets and restarts clean
-initSimulation();
-isGameOver = false;
-isRunning = true;
-playPauseBtn.innerText = "Pause";
-playPauseBtn.classList.remove('paused');
-menuOverlay.classList.add('hidden');
-return;
-}
-if (isRunning) {
-isRunning = false;
-playPauseBtn.innerText = "Resume";
-playPauseBtn.classList.add('paused');
-overlayTitle.innerText = "Simulation Paused";
-overlaySub.innerText = "Take a breather — the micro-cosmos is on standby";
-bigActionBtn.innerText = "Resume Simulation";
-selectorContainer.style.display = "none"; // Hide size choices while simply paused
-menuOverlay.classList.remove('hidden');
-} else {
-isRunning = true;
-playPauseBtn.innerText = "Pause";
-playPauseBtn.classList.remove('paused');
-menuOverlay.classList.add('hidden');
-if (isFirstStart) {
-initSimulation();
-isFirstStart = false;
-}
-}
-}
-bigActionBtn.addEventListener('click', togglePausePlay);
-playPauseBtn.addEventListener('click', togglePausePlay);
-resetBtn.addEventListener('click', () => {
-initSimulation();
-ctx.fillStyle = '#0b0c10';
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-if (isGameOver) {
-isGameOver = false;
-overlayTitle.innerText = "RPSLS CHAOS";
-overlaySub.innerText = "Rock • Paper • Scissors • Lizard • Spock";
-bigActionBtn.innerText = "Start Simulation";
-selectorContainer.style.display = "flex";
-}
-});
-// Initialize App Configuration viewports
-buildChartDOM();
-animate();
+        const resetBtn = document.getElementById('resetBtn');
+
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.radius = PARTICLE_SIZE;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+            }
+
+            update() {
+                this.vx += (Math.random() - 0.5) * CHAOS_FACTOR;
+                this.vy += (Math.random() - 0.5) * CHAOS_FACTOR;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                const speed = Math.hypot(this.vx, this.vy);
+                if (speed > MAX_SPEED) {
+                    this.vx = (this.vx / speed) * MAX_SPEED;
+                    this.vy = (this.vy / speed) * MAX_SPEED;
+                }
+
+                if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
+                if (this.x + this.radius > canvas.width) { this.x = canvas.width - this.radius; this.vx *= -1; }
+                if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -1; }
+                if (this.y + this.radius > canvas.height) { this.y = canvas.height - this.radius; this.vy *= -1; }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.font = `${this.radius * 2}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(TYPES[this.type].emoji, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        // Particle Impact / Explosion Particle Class
+        class CollisionEffect {
+            constructor(x, y, color, type = 'ring') {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.type = type;
+                this.radius = PARTICLE_SIZE;
+                this.alpha = 1;
+                
+                // For explosion particles
+                if (type === 'spark') {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 2 + Math.random() * 6;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+                    this.decay = 0.015 + Math.random() * 0.02;
+                    this.radius = 2 + Math.random() * 4;
+                } else {
+                    this.decay = 0.04;
+                }
+            }
+            update() {
+                if (this.type === 'spark') {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                } else {
+                    this.radius += 1.5;
+                }
+                this.alpha -= this.decay;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                if (this.type === 'spark') {
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                } else {
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        function getSelectedSpawnCount() {
+            const checkedRadio = document.querySelector('input[name="spawnCount"]:checked');
+            return checkedRadio ? parseInt(checkedRadio.value, 10) : 50;
+        }
+
+        function initSimulation() {
+            particles = [];
+            visualEffects = [];
+            isGameOver = false;
+
+            const itemsPerSpecies = getSelectedSpawnCount();
+            
+            // Generate exact chosen numbers balanced perfectly across all species
+            TYPE_KEYS.forEach(typeKey => {
+                for (let i = 0; i < itemsPerSpecies; i++) {
+                    const x = Math.random() * (canvas.width - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
+                    const y = Math.random() * (canvas.height - PARTICLE_SIZE * 2) + PARTICLE_SIZE;
+                    particles.push(new Particle(x, y, typeKey));
+                }
+            });
+
+            buildChartDOM();
+            updateScoresAndCharts();
+        }
+
+        function buildChartDOM() {
+            const container = document.getElementById('chartBars');
+            container.innerHTML = '';
+            TYPE_KEYS.forEach(k => {
+                container.innerHTML += `
+                    <div class="bar-wrapper">
+                        <div class="bar-label"><span>${TYPES[k].emoji}</span><span id="pct${k}">0%</span></div>
+                        <div class="bar-track"><div id="bar${k}" class="bar-fill" style="background:${TYPES[k].color}"></div></div>
+                    </div>
+                `;
+            });
+        }
+
+        function processInteractions() {
+            for (let i = 0; i < particles.length; i++) {
+                const p1 = particles[i];
+                let closestPrey = null;
+                let minDist = Infinity;
+
+                for (let j = 0; j < particles.length; j++) {
+                    if (i === j) continue;
+                    const p2 = particles[j];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist < p1.radius + p2.radius) {
+                        handleCombat(p1, p2);
+                    }
+
+                    if (TYPES[p1.type].beats.includes(p2.type) && dist < minDist) {
+                        minDist = dist;
+                        closestPrey = p2;
+                    }
+                }
+
+                if (closestPrey && minDist < 300) {
+                    p1.vx += ((closestPrey.x - p1.x) / minDist) * ATTRACTION_FORCE;
+                    p1.vy += ((closestPrey.y - p1.y) / minDist) * ATTRACTION_FORCE;
+                }
+            }
+        }
+
+        function handleCombat(p1, p2) {
+            if (p1.type === p2.type) return;
+
+            if (TYPES[p1.type].beats.includes(p2.type)) {
+                spawnEffect(p2.x, p2.y, TYPES[p1.type].color);
+                p2.type = p1.type;
+            } else if (TYPES[p2.type].beats.includes(p1.type)) {
+                spawnEffect(p1.x, p1.y, TYPES[p2.type].color);
+                p1.type = p2.type;
+            }
+        }
+
+        function spawnEffect(x, y, color, type = 'ring') {
+            visualEffects.push(new CollisionEffect(x, y, color, type));
+        }
+
+        // Creates a firework/shrapnel explosion at canvas center
+        function spawnVictoryExplosion(color) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            for (let i = 0; i < 150; i++) {
+                spawnEffect(centerX, centerY, color, 'spark');
+            }
+        }
+
+        function updateScoresAndCharts() {
+            let counts = { ROCK: 0, PAPER: 0, SCISSORS: 0, LIZARD: 0, SPOCK: 0 };
+            particles.forEach(p => counts[p.type]++);
+
+            let total = particles.length || 1;
+            let activeSpecies = [];
+
+            TYPE_KEYS.forEach(k => {
+                document.getElementById(`lbl${k}`).innerText = counts[k];
+                let percent = Math.round((counts[k] / total) * 100);
+                document.getElementById(`pct${k}`).innerText = `${percent}%`;
+                document.getElementById(`bar${k}`).style.width = `${percent}%`;
+                
+                if (counts[k] > 0) {
+                    activeSpecies.push(k);
+                }
+            });
+
+            // Trigger Win Splash Screen condition check
+            if (activeSpecies.length === 1 && !isGameOver && !isFirstStart) {
+                triggerWinScreen(activeSpecies);
+            }
+        }
+
+        function triggerWinScreen(winnerKey) {
+            isGameOver = true;
+            isRunning = false;
+            
+            const winner = TYPES[winnerKey];
+            
+            // Pop the dynamic victory screen elements
+            overlayTitle.innerHTML = `${winner.emoji} VICTORY ${winner.emoji}`;
+            overlaySub.innerText = `${winnerKey} has conquered the entire chaotic cosmos!`;
+            bigActionBtn.innerText = "Run Another Simulation";
+            
+            // Bring back the particle counting selector options for the next match
+            selectorContainer.style.display = "flex";
+            menuOverlay.classList.remove('hidden');
+            
+            // Shoot a gigantic center explosion
+            spawnVictoryExplosion(winner.color);
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (isGameOver) return;
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            for(let i=0; i<5; i++) {
+                const offsetAngle = Math.random() * Math.PI * 2;
+                const offsetDist = Math.random() * 15;
+                const finalX = mouseX + Math.cos(offsetAngle) * offsetDist;
+                const finalY = mouseY + Math.sin(offsetAngle) * offsetDist;
+                
+                const randomType = TYPE_KEYS[Math.floor(Math.random() * TYPE_KEYS.length)];
+                particles.push(new Particle(finalX, finalY, randomType));
+            }
+            
+            spawnEffect(mouseX, mouseY, '#45f3ff');
+            updateScoresAndCharts();
+        });
+
+        function animate() {
+            // Lowered blur trail opacity refresh: changed from 0.25 to 0.8 to drastically reduce blurring/ghosting
+            ctx.fillStyle = 'rgba(11, 12, 16, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (isRunning) {
+                processInteractions();
+                particles.forEach(p => p.update());
+            }
+
+            particles.forEach(p => p.draw());
+
+            // Handle active spark and wave entities
+            for (let i = visualEffects.length - 1; i >= 0; i--) {
+                visualEffects[i].update();
+                visualEffects[i].draw();
+                if (visualEffects[i].alpha <= 0) visualEffects.splice(i, 1);
+            }
+
+            if (isRunning) {
+                updateScoresAndCharts();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function togglePausePlay() {
+            if (isGameOver) {
+                // If the game ended, the big button now resets and restarts clean
+                initSimulation();
+                isGameOver = false;
+                isRunning = true;
+                playPauseBtn.innerText = "Pause";
+                playPauseBtn.classList.remove('paused');
+                menuOverlay.classList.add('hidden');
+                return;
+            }
+
+            if (isRunning) {
+                isRunning = false;
+                playPauseBtn.innerText = "Resume";
+                playPauseBtn.classList.add('paused');
+                overlayTitle.innerText = "Simulation Paused";
+                overlaySub.innerText = "Take a breather — the micro-cosmos is on standby";
+                bigActionBtn.innerText = "Resume Simulation";
+                selectorContainer.style.display = "none"; // Hide size choices while simply paused
+                menuOverlay.classList.remove('hidden');
+            } else {
+                isRunning = true;
+                playPauseBtn.innerText = "Pause";
+                playPauseBtn.classList.remove('paused');
+                menuOverlay.classList.add('hidden');
+                if (isFirstStart) {
+                    initSimulation();
+                    isFirstStart = false;
+                }
+            }
+        }
+
+        bigActionBtn.addEventListener('click', togglePausePlay);
+        playPauseBtn.addEventListener('click', togglePausePlay);
+        
+        resetBtn.addEventListener('click', () => {
+            initSimulation();
+            ctx.fillStyle = '#0b0c10';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (isGameOver) {
+                isGameOver = false;
+                overlayTitle.innerText = "RPSLS CHAOS";
+                overlaySub.innerText = "Rock • Paper • Scissors • Lizard • Spock";
+                bigActionBtn.innerText = "Start Simulation";
+                selectorContainer.style.display = "flex";
+            }
+        });
+
+        // Initialize App Configuration viewports
+        buildChartDOM();
+        animate();
+    </script>
+</body>
+</html>
